@@ -2,6 +2,7 @@ package com.xterm.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Typeface
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,12 +43,32 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.ResourcesCompat
+import com.xterm.R
 import com.xterm.data.Server
 import com.xterm.ssh.ConnState
 import com.xterm.ssh.LinuxEnv
 import com.xterm.ssh.LinuxEnvState
 import org.connectbot.terminal.SelectionController
 import org.connectbot.terminal.Terminal
+
+/**
+ * 终端必须显式指定打包进 APK 的等宽字体，不能依赖 termlib 默认的 Typeface.MONOSPACE。
+ *
+ * termlib 用 `paint.measureText("M")` 作为单元格宽度，再按 `col * cellWidth` 逐格绘制，
+ * 并据此计算 cols/rows 通知 PTY resize。系统 MONOSPACE 在部分 ROM 上会走字体 fallback，
+ * "M" 的 advance 与普通 ASCII 字形宽度不一致，导致字符间距被拉开、列数偏小、
+ * 长行被提前折行。JetBrains Mono 自带字形、所有 ASCII 字符 advance 严格相等，
+ * 与旧版 xterm / Flutter 版（引擎内置 monospace）表现一致。
+ */
+@Composable
+private fun terminalTypeface(): Typeface {
+    val context = LocalContext.current
+    return remember {
+        ResourcesCompat.getFont(context, R.font.jetbrainsmono_regular)
+            ?: Typeface.MONOSPACE
+    }
+}
 
 /**
  * 对齐 Aurora `pages/terminal_page.dart`：完整终端页。
@@ -75,6 +96,7 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
 
     val focusRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val mono = terminalTypeface()
 
     var imeVisible by remember { mutableStateOf(false) }
     // showSoftKeyboard 是状态而非常量：进入页面不自动弹键盘，单击终端 / IME 键
@@ -176,6 +198,7 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
                     Terminal(
                         terminalEmulator = emu,
                         modifier = Modifier.fillMaxSize(),
+                        typeface = mono,
                         initialFontSize = settings.fontSize.sp,
                         backgroundColor = bg,
                         foregroundColor = fg,
