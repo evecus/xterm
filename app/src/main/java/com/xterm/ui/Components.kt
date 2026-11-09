@@ -37,6 +37,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -200,6 +203,9 @@ fun UsageBar(ratio: Float, label: String, sub: String? = null) {
         r > 0.75f -> Color(0xFFFF9800)
         else -> scheme.primary
     }
+    // auroraCardColor() 是 @Composable，只能在 Composable 上下文求值；
+    // Canvas 的 DrawScope lambda 不是 Composable，不能在其中调用。
+    val trackColor = auroraCardColor()
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -216,7 +222,7 @@ fun UsageBar(ratio: Float, label: String, sub: String? = null) {
         }
         Spacer(Modifier.height(6.dp))
         Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
-            drawRect(color = auroraCardColor(), size = size)
+            drawRect(color = trackColor, size = size)
             drawRect(color = color, size = Size(size.width * r, size.height))
         }
     }
@@ -306,9 +312,7 @@ fun InputDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by androidx.compose.runtime.remember(initial) {
-        androidx.compose.runtime.mutableStateOf(initial)
-    }
+    var text by remember(initial) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

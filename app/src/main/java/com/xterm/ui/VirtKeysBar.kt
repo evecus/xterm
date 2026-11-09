@@ -116,7 +116,8 @@ fun VirtKeysBar(
                 }
                 val ch = raw
                 if (ctrl) {
-                    val code = ch.uppercaseChar().code
+                    // ch 是单字符 String：uppercaseChar() 是 Char 的扩展，须先取首字符
+                    val code = ch.first().uppercaseChar().code
                     val out = when {
                         code in 65..90 -> (code - 64).toChar().toString()   // A-Z → 1-26
                         code in 91..95 -> (code - 91 + 27).toChar().toString() // [\]^_ → 27-31
