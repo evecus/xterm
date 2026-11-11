@@ -8,11 +8,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -98,7 +104,10 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
     val context = LocalContext.current
     val mono = terminalTypeface()
 
-    var imeVisible by remember { mutableStateOf(false) }
+    // 直接观察 Compose 的 ime insets（与 Aurora 的 viewInsets.bottom > 0 同语义）。
+    // 不依赖 termlib 的 onImeVisibilityChanged 回调链：该回调经 LaunchedEffect 中转，
+    // 实测同设备不同会话会丢失显隐时序，导致键盘已弹出但虚拟按键条不出现。
+    val imeVisible = WindowInsets.isImeVisible
     // showSoftKeyboard 是状态而非常量：进入页面不自动弹键盘，单击终端 / IME 键
     // 才请求弹出；收起后同步置 false，等价于 Aurora 的 _focusWithoutKeyboard/_toggleIme。
     var showSoftKeyboard by remember { mutableStateOf(false) }
@@ -163,7 +172,15 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // targetSdk 35+ 强制 edge-to-edge 后 adjustResize 不再让窗口避让键盘，
+                // 必须手动消费底部 ime insets：键盘弹出时内容整体上移，始终显示在键盘上方。
+                // 旧版 TerminalScreen 同款写法（真机验证过）；非 edge-to-edge 时该 insets 为 0，无副作用。
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+        ) {
             // Linux：rootfs 尚未部署时先下载解压，再进入 shell。
             if (server.isLinux &&
                 (linuxState == LinuxEnvState.DOWNLOADING || linuxState == LinuxEnvState.EXTRACTING)
@@ -212,7 +229,7 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
                             runCatching { focusRequester.requestFocus() }
                         },
                         onImeVisibilityChanged = { visible ->
-                            imeVisible = visible
+                            // 只用于同步隐藏请求；显示状态由上面的 WindowInsets.isImeVisible 驱动。
                             if (!visible) showSoftKeyboard = false
                         },
                         onSelectionControllerAvailable = { controller ->
