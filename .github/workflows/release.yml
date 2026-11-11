@@ -28,8 +28,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # 本机终端 / proot 用到了 NDK JNI 库（app/src/main/cpp/pty.c），
-      # 需要 NDK 与 CMake 3.22.1；镜像通常已预装，缺失时补装。
       - name: Ensure NDK and CMake
         run: |
           SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
@@ -47,19 +45,6 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
           echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/app/release.keystore" >> "$GITHUB_ENV"
-
-      # proot 二进制不进仓库（Aurora 亦如此）。构建成功则 Linux 终端可用；
-      # 失败不阻断 APK 产出，运行时会提示缺少 libproot.so。
-      # 脚本默认输出到 Flutter 的 android/app/... 路径，本工程是原生 Android
-      # 结构，必须用 PROOT_OUT_DIR 覆盖到 app/src/main/jniLibs/arm64-v8a。
-      - name: Build proot (optional)
-        continue-on-error: true
-        env:
-          PROOT_OUT_DIR: ${{ github.workspace }}/app/src/main/jniLibs/arm64-v8a
-          PROOT_BUILD_DIR: ${{ github.workspace }}/build/proot-android
-        run: |
-          chmod +x scripts/build-proot-android.sh
-          ./scripts/build-proot-android.sh
 
       - name: Build release APK (arm64-v8a, R8 minified)
         run: ./gradlew assembleRelease --stacktrace
