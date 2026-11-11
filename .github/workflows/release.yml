@@ -64,34 +64,17 @@ jobs:
       - name: Build release APK (arm64-v8a, R8 minified)
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Show APK info
-        run: |
-          ls -lh app/build/outputs/apk/release/
-          APK=$(ls app/build/outputs/apk/release/*arm64*.apk)
-          $ANDROID_HOME/build-tools/37.0.0/apksigner verify --print-certs "$APK" || echo "unsigned APK (未配置签名 Secrets)"
-
       - name: Rename APK
         run: |
           APK=$(ls app/build/outputs/apk/release/*arm64*.apk)
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          cp "$APK" SSH-Term-${VERSION}-arm64-release.apk
+          cp "$APK" xterm-${VERSION}-arm64-release.apk
           MAPPING=$(find app/build/outputs -name "mapping.txt" | head -1)
-          [ -n "$MAPPING" ] && cp "$MAPPING" SSH-Term-mapping-${VERSION}.txt || true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sshterm-release
-          path: |
-            SSH-Term-*-arm64-release.apk
-            SSH-Term-mapping-*.txt
-          if-no-files-found: error
+          [ -n "$MAPPING" ] && cp "$MAPPING" xterm-mapping-${VERSION}.txt || true
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: test
           files: |
-            SSH-Term-*-arm64-release.apk
-            SSH-Term-mapping-*.txt
-          generate_release_notes: true
+            xterm-*-arm64-release.apk
