@@ -111,10 +111,13 @@ class LocalShellSession(
         val tmpDir = env.ensureProotTmpDir()
 
         val binds = mutableListOf("/dev:/dev", "/proc:/proc", "/sys:/sys")
-        for (path in listOf("/sdcard", "/storage", "/mnt", "/dev/pts", "/dev/shm", "/dev/ashmem")) {
+        // /dev 已整体绑定，/dev/pts、/dev/shm、/dev/ashmem 等子路径会随之可见，
+        // 再单独绑定只会触发 proot 的 "can't sanitize binding" 警告，故不再重复绑定。
+        for (path in listOf("/sdcard", "/storage", "/mnt")) {
             if (accessible(path)) binds.add("$path:$path")
         }
         val args = mutableListOf<String>(
+            "-v", "-1", // 关闭 proot 的非致命警告输出（致命错误仍会打印）
             "--kill-on-exit",
             "--link2symlink",
             "-0",
