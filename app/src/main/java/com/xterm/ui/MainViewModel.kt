@@ -214,6 +214,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             fg.toArgbPacked(),
             bg.toArgbPacked(),
         )
+        // applyColorScheme 只改 libvterm 的「默认色」，不会刷新当前画笔（pen）：
+        // 画笔里仍是 libvterm 初始的 240 灰前景 + 纯黑背景，直到收到第一条 SGR 0。
+        // nano / vim / less 进入备用屏（?1049h）时会保存这支旧画笔，退出（?1049l）时原样恢复，
+        // 于是此后输出与清屏都用黑底，界面从白底黑字变成黑底白字。
+        // 这里主动让画笔对齐默认色：ESC[0m 复位画笔，ESC 7 同步写入「已保存画笔」。
+        // 此时还没有连接、光标在 (0,0)，写入没有副作用。
+        runCatching { emu.writeInput("\u001b[0m\u001b7".toByteArray()) }
+        appliedDark = dark
         emulator = emu
     }
 
@@ -314,15 +322,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { emulator?.pasteText(text) }
     }
 
+    /** 终端模拟器当前已套用的主题；用于避免同主题重复套用时打断正在运行的程序。 */
+    private var appliedDark: Boolean? = null
+
     fun applyTerminalTheme(dark: Boolean) {
+        val emu = emulator ?: return
+        // createEmulator 已按当前主题套用过；进入终端页的 LaunchedEffect 不必再来一次。
+        if (appliedDark == dark) return
         val fg = if (dark) Color(0xFFCCCCCC) else Color(0xFF333333)
         val bg = if (dark) Color(0xFF1E1E1E) else Color(0xFFFAFAFA)
         runCatching {
-            emulator?.applyColorScheme(
+            emu.applyColorScheme(
                 if (dark) AuroraDarkAnsi else AuroraLightAnsi,
                 fg.toArgbPacked(),
                 bg.toArgbPacked(),
             )
+            // 同 createEmulator：让画笔对齐新默认色（运行时切换主题不写 ESC 7，
+            // 以免覆盖全屏程序自己保存的光标位置）。
+            emu.writeInput("\u001b[0m".toByteArray())
+            appliedDark = dark
         }
     }
 
