@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -85,7 +86,7 @@ private fun terminalTypeface(): Typeface {
  * - 长按有选区复制、无选区粘贴（termlib 内置选区工具条 + onPasteRequest）；
  * - SSH 连接中返回时按设置弹出「断开连接？」确认，本机 / Linux 直接退出。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TerminalPage(vm: MainViewModel, server: Server) {
     val settings by vm.settings.collectAsState()
