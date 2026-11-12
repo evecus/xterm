@@ -1709,6 +1709,8 @@ internal fun TerminalWithAccessibility(
                     // 上游默认把两个手柄画成纯白色（drawSelectionHandle 的默认参数），
                     // 在浅色终端背景上完全看不见，看起来就像「没有拖动条」。
                     // 这里优先使用调用方给的对比色；未指定时保持上游原行为。
+                    // 两个手柄的形态统一为「圆在字符下方、尖朝上」，pointingDown
+                    // 现在只用于 lineMode 下两个横条的左右错开，不再区分首尾朝向。
                     if (selectionManager.mode != SelectionMode.NONE && !selectionManager.isSelecting) {
                         val handleColor = selectionHandleColor.takeUnless { it == Color.Unspecified }
                             ?: Color.White
@@ -2362,9 +2364,9 @@ internal fun isTouchingHandle(
     lineHandleWidth: Float = 32f,
     lineHandleGap: Float = 8f,
 ): Pair<Boolean, Boolean> {
-    // Handle circles are drawn offset from the character edge by their radius (~12dp).
-    // Start handle points up (circle above the character top),
-    // end handle points down (circle below the character bottom).
+    // Both handles are teardrops with the tip pointing up: the circle sits below the
+    // character bottom by its radius (~12dp). Hit-testing uses the same circle center
+    // as drawing (see drawSelectionHandle), so the start handle is also below its row.
     // Use a generous hit radius centered on the circle's visual center.
     val handleRadius = charHeight * 0.4f // approximate circle radius
     val sameRow = range.startRow == range.endRow
@@ -2375,7 +2377,7 @@ internal fun isTouchingHandle(
             (range.startRow + 0.5f) * charHeight,
         )
     } else {
-        Offset(range.startCol * charWidth + charWidth / 2, range.startRow * charHeight - handleRadius)
+        Offset(range.startCol * charWidth + charWidth / 2, range.startRow * charHeight + charHeight + handleRadius)
     }
     val endPos = if (mode == SelectionMode.LINE) {
         Offset(
@@ -2612,7 +2614,9 @@ private fun MagnifyingGlass(
 }
 
 /**
- * Draw a selection handle (teardrop shape).
+ * Draw a selection handle as a teardrop with the tip pointing up
+ * (circle below the character bottom, tip reaching back into the text).
+ * Both start and end handles use this same orientation.
  */
 private fun DrawScope.drawSelectionHandle(
     row: Int,
@@ -2641,28 +2645,18 @@ private fun DrawScope.drawSelectionHandle(
         )
         return
     }
-    val handleWidthPx = SELECTION_HANDLE_WIDTH.toPx()
-
-    // Position handle at the character position
+    // 两个手柄统一为「圆球在字符下方、尖朝上指向文字」（对齐系统原生 / 参考图一）。
+    // 上游原本让起点手柄圆在字符上方、尖朝下，终点手柄圆在下方、尖朝上，两者不统一；
+    // 这里始终以字符底部为锚点。pointingDown 参数仅保留给上面 lineMode 分支做左右错开，
+    // 字符 / 词语模式下的形态不再区分首尾。
     val charX = col * charWidth
     val charY = row * charHeight
 
-    // Center the handle horizontally on the character
+    // 水平居中于字符
     val handleX = charX + charWidth / 2
 
-    // Position vertically based on direction
-    val handleY = if (pointingDown) {
-        charY + charHeight // Bottom of character
-    } else {
-        charY // Top of character
-    }
-
-    val circleRadius = handleWidthPx / 2
-    val circleY = if (pointingDown) {
-        handleY + circleRadius
-    } else {
-        handleY - circleRadius
-    }
+    val circleRadius = SELECTION_HANDLE_WIDTH.toPx() / 2
+    val circleY = charY + charHeight + circleRadius
 
     drawCircle(
         color = color,
@@ -2670,13 +2664,12 @@ private fun DrawScope.drawSelectionHandle(
         center = Offset(handleX, circleY),
     )
 
-    // 补上指向字符的尖角，做成 Android 系统原生文本选择手柄的水滴形（图一效果）。
-    // 只改外观：手柄命中判定仍按圆心计算（isTouchingHandle），拖动逻辑完全不变。
-    val tipSign = if (pointingDown) -1f else 1f
+    // 尖角朝上：从圆内向上收拢并略微伸进文字，形成水滴。
+    // 命中判定按同一个圆心计算（isTouchingHandle），拖动逻辑完全不变。
     val tipPath = ComposePath().apply {
-        moveTo(handleX - circleRadius * 0.72f, circleY + tipSign * circleRadius * 0.55f)
-        lineTo(handleX, circleY + tipSign * (circleRadius + circleRadius * 0.45f))
-        lineTo(handleX + circleRadius * 0.72f, circleY + tipSign * circleRadius * 0.55f)
+        moveTo(handleX - circleRadius * 0.72f, circleY - circleRadius * 0.55f)
+        lineTo(handleX, circleY - (circleRadius + circleRadius * 0.45f))
+        lineTo(handleX + circleRadius * 0.72f, circleY - circleRadius * 0.55f)
         close()
     }
     drawPath(tipPath, color)
