@@ -60,6 +60,16 @@ import org.connectbot.terminal.SelectionController
 import org.connectbot.terminal.Terminal
 
 /**
+ * 终端内容左右留白：文字不再贴着屏幕边缘（对齐图一的参考效果）。
+ * 只加水平方向，垂直方向仍铺满，避免白白挤压可见行数。
+ */
+private val TERMINAL_HORIZONTAL_PADDING = 12.dp
+
+/** 选区拖动手柄颜色：浅色用系统文本选择蓝，深色用高亮蓝，两种主题下都清晰可见。 */
+private val SELECTION_HANDLE_LIGHT = Color(0xFF1A73E8)
+private val SELECTION_HANDLE_DARK = Color(0xFF8AB4F8)
+
+/**
  * 终端必须显式指定打包进 APK 的等宽字体，不能依赖 termlib 默认的 Typeface.MONOSPACE。
  *
  * termlib 用 `paint.measureText("M")` 作为单元格宽度，再按 `col * cellWidth` 逐格绘制，
@@ -215,13 +225,19 @@ fun TerminalPage(vm: MainViewModel, server: Server) {
                 if (emu != null) {
                     Terminal(
                         terminalEmulator = emu,
-                        modifier = Modifier.fillMaxSize(),
+                        // 左右留出空隙：padding 区域由 Scaffold 的同色背景填充，
+                        // 视觉上就是终端文字离屏幕两侧有一段留白。
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = TERMINAL_HORIZONTAL_PADDING),
                         typeface = mono,
                         initialFontSize = settings.fontSize.sp,
                         backgroundColor = bg,
                         foregroundColor = fg,
                         // Aurora _darkTheme.selection = 0x40FFFFFF / _lightTheme.selection = 0x40000000
                         selectionBackgroundColor = if (dark) Color(0x40FFFFFF) else Color(0x40000000),
+                        // 原库手柄是白色，浅色背景下看不见；传入对比色后两个蓝色水滴手柄可见且可拖动。
+                        selectionHandleColor = if (dark) SELECTION_HANDLE_DARK else SELECTION_HANDLE_LIGHT,
                         keyboardEnabled = connState is ConnState.Connected,
                         showSoftKeyboard = showSoftKeyboard,
                         focusRequester = focusRequester,

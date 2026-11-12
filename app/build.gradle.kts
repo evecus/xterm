@@ -15,13 +15,17 @@ android {
         versionCode = 2
         versionName = "1.0.0"
 
-        // 只保留中文/英文资源，其余语言资源在精简时全部剔除
-        androidResources {
-            localeFilters += listOf("zh", "en")
-        }
+        // 不再按语言过滤资源：
+        // termlib 的中文选区菜单在 values-zh-rCN/，原先的 localeFilters("zh", "en")
+        // 会把带地区后缀的中文资源剔除，中文系统回退到库默认的英文 Copy / Select All…
+        // 这里改为不过滤（54 个 values 目录均为纯文本，合计不足 20KB，对 APK 无实质影响），
+        // 同时由 app 的 res/values/strings.xml 覆盖为中文，任何系统语言下都显示中文。
+        // androidResources {
+        //     localeFilters += listOf("zh", "en")
+        // }
     }
 
-    // termlib 的 AAR 自带 4 个 ABI 的 libjni_cb_term.so，按 ABI 拆分，
+    // termlib（本地 module）自带 4 个 ABI 的 libjni_cb_term.so，按 ABI 拆分，
     // universalApk=false 时只产出单 ABI APK（含 arm64-v8a 一份，约 10MB）
     splits {
         abi {
@@ -95,7 +99,8 @@ kotlin {
 
 dependencies {
     // ---- ConnectBot 全家桶：Compose 终端模拟器 + SSH 协议栈 ----
-    implementation("org.connectbot:termlib:0.3.14")
+    // termlib 由本地源码 module 提供（选区手柄颜色需定制），版本仍为 0.3.14
+    implementation(project(":termlib"))
     implementation("org.connectbot:sshlib:2.2.23")
 
     // ---- Jetpack Compose（BOM 版本必须与 termlib 0.3.14 一致，否则二进制不兼容）----

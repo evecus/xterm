@@ -47,7 +47,7 @@
 | AGP / Gradle / Kotlin | 9.4.1 / 9.8.0 / 2.4.21（AGP 9 内置 Kotlin） |
 | Compose BOM | 2026.09.00 |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 24 |
-| org.connectbot:termlib | 0.3.14 |
+| org.connectbot:termlib | 0.3.14（本地源码 module `:termlib`，见「本次改动」一节） |
 | org.connectbot:sshlib | 2.2.23 |
 | NDK / CMake | 27.x / 3.22.1（编译 `libxtermpty.so`） |
 
@@ -110,6 +110,7 @@ CI：`.github/workflows/release.yml` — push 或手动触发时构建 **arm64-v
 ## 目录结构
 
 ```
+termlib/                      termlib 0.3.14 本地源码 module（源码 / res / jniLibs，仅定制选区手柄）
 app/src/main/
 ├── cpp/                     pty.c / CMakeLists.txt（JNI 真 PTY）
 ├── java/com/xterm/
@@ -143,10 +144,39 @@ Terminal 尺寸变化 → onResize(TerminalDimensions) → TerminalConnection.re
 | --- | --- |
 | 主机密钥 | 多一层 TOFU 确认弹窗（xterm 原有安全能力），其余流程不变 |
 | 凭据 | 落盘 AES-256-GCM 加密（Aurora 为明文 JSON） |
-| 选区手柄 | 使用 termlib 内置的长按选区 / 手柄 / 复制全选粘贴工具条，而非 Aurora 的自绘 `SelectionHandles` |
+| 选区手柄 | 使用 termlib 内置的长按选区 / 手柄 / 拖动 / 复制全选粘贴工具条（手柄配色与形状已定制为蓝色水滴），而非 Aurora 的自绘 `SelectionHandles` |
 | 文件下载 | 保存到 `getExternalFilesDir(DIRECTORY_DOWNLOADS)/aurora_downloads/`（对标 Aurora 的 `应用文档目录/aurora_downloads`），不弹系统保存框 |
 | 文件上传 | 用系统文件选择器（SAF，支持多选）替代 `file_picker` |
 | proot 二进制 | 同 Aurora，不进仓库，需构建时生成 |
+
+## 本次改动：终端文本选择体验
+
+对齐参考图（图一）的三点体验，改动前后对比如下。
+
+| # | 问题 | 根因 | 改动 | 改动后 |
+| --- | --- | --- | --- | --- |
+| 1 | 选中文字看不到拖动条 | termlib 的 `drawSelectionHandle` 默认色硬编码 `Color.White`，浅色终端背景上白色手柄完全不可见；库本身其实已有 `HandleDrag` 拖动手势、放大镜与边缘自动滚动 | `:termlib` 新增 `selectionHandleColor` 参数贯穿到手柄绘制，并补上指向字符的尖角做成水滴形；`TerminalPage` 按明暗主题传入蓝色 | 两个蓝色水滴手柄，按住即可拖动调整选区；拖动命中判定仍按圆心计算，行为不变 |
+| 2 | 选区按钮 / 溢出菜单是英文 | `localeFilters("zh", "en")` 把 termlib 的 `values-zh-rCN/` 中文资源剔除，中文系统回退到库默认英文 `Copy` / `Select All` / `Mode: Character` | 移除语言过滤；`res/values/strings.xml` 覆盖 9 条 `terminal_selection_*` 为中文（译法逐条对齐库自带 zh-rCN） | 复制 / 全选 / 选择所有可见文本 / 分享 / 粘贴 / 模式：字符 / 模式：词语 / 模式：行 / 更多选项，任何系统语言都显示中文 |
+| 3 | 终端文字贴着屏幕两侧 | `Terminal` 的 modifier 是 `Modifier.fillMaxSize()`，没有内边距 | 改为 `.fillMaxSize().padding(horizontal = 12.dp)` | 左右各留 12dp 空隙，垂直方向仍铺满；padding 区域由 Scaffold 同色背景填充 |
+
+### 为什么把 termlib 纳入本地源码 module
+
+`org.connectbot:termlib:0.3.14` 没有暴露任何手柄颜色 API，`0.3.15` 源码与 `0.3.14`
+逐文件一致（同样硬编码 `Color.White`），只改 app 层无法让手柄可见；在 app 里自绘一层手柄
+又拿不到库内部的选区行列、字符尺寸与滚动位置，只能做成「看得见但拖不动」的假手柄。
+因此把 AAR 内的 46 个 Kotlin 源文件、54 个语言资源目录、4 个 ABI 的 `libjni_cb_term.so`
+原样搬进 `:termlib`，只改 `Terminal.kt` 一处（新增参数 + 手柄配色 / 形状），
+其余行为与上游 0.3.14 一致。
+
+| 项 | 改动前 | 改动后 |
+| --- | --- | --- |
+| 依赖 | `implementation("org.connectbot:termlib:0.3.14")` | `implementation(project(":termlib"))` |
+| 模块 | `:app` | `:app` + `:termlib`（`com.android.library`，namespace `org.connectbot.terminal`） |
+| 版本 | AGP 9.4.1 / Kotlin 2.4.21 / Compose BOM 2026.09.00 | 完全不变，依赖逐条对齐原 AAR 的 POM |
+| 资源过滤 | `localeFilters += listOf("zh", "en")` | 移除（54 个 values 目录合计不足 20KB） |
+| 库源码改动 | — | 仅 `termlib/src/main/java/org/connectbot/terminal/Terminal.kt` |
+
+> 本地环境无 Android SDK，未执行 `assembleDebug`；请 push 触发 CI（`.github/workflows/release.yml`）验证编译。
 
 ## 本次交付的验证状态
 

@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">xterm</string>
+
+    <!--
+        覆盖 termlib 的选区工具条 / 溢出菜单默认英文文案。
+        app 的资源优先级高于 library，且这里是无 locale 限定符的默认资源：
+        中文系统用库自带的 values-zh-rCN（译法与下面一致），
+        英文等其他系统语言则回退到这里，保证任何语言下都显示中文。
+        译法逐条对齐 termlib-0.3.14 的 values-zh-rCN/values-zh-rCN.xml。
+    -->
+    <string name="terminal_selection_copy">复制</string>
+    <string name="terminal_selection_select_all">全选</string>
+    <string name="terminal_selection_select_all_visible">选择所有可见文本</string>
+    <string name="terminal_selection_share">分享</string>
+    <string name="terminal_selection_paste">粘贴</string>
+    <string name="terminal_selection_mode_character">模式：字符</string>
+    <string name="terminal_selection_mode_word">模式：词语</string>
+    <string name="terminal_selection_mode_line">模式：行</string>
+    <string name="terminal_selection_more_options_description">更多选项</string>
 </resources>
